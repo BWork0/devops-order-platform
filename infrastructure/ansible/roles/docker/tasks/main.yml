@@ -1,0 +1,56 @@
+- name: Remove conflicting Docker packages
+  ansible.builtin.apt:
+    name: "{{ docker_conflicting_packages }}"
+    state: absent
+
+- name: Install prerequisites
+  ansible.builtin.apt:
+    name: "{{ docker_required_packages }}"
+    state: present
+    update_cache: true
+
+- name: Create APT keyrings directory
+  ansible.builtin.file:
+    path: "{{ docker_keyring_dir }}"
+    state: directory
+    mode: "0755"
+
+- name: Download Docker GPG key
+  ansible.builtin.get_url:
+    url: "{{ docker_gpg_key_url }}"
+    dest: "{{ docker_gpg_key_path }}"
+    mode: "0644"
+
+- name: Add Docker APT repository
+  ansible.builtin.deb822_repository:
+    name: "{{ docker_repo_name }}"
+    types:
+      - deb
+    uris:
+      - "{{ docker_repo_uri }}"
+    suites:
+      - "{{ ansible_facts['distribution_release'] }}"
+    components: "{{ docker_repo_components }}"
+    architectures: "{{ docker_repo_architectures }}"
+    signed_by: "{{ docker_gpg_key_path }}"
+
+- name: Install Docker packages
+  ansible.builtin.apt:
+    name: "{{ docker_packages }}"
+    state: present
+    update_cache: true
+
+- name: Add users to the docker group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: docker
+    append: true
+  loop: "{{ docker_users }}"
+  loop_control:
+    label: "{{ item }}"
+
+- name: Ensure Docker service is running
+  ansible.builtin.service:
+    name: "{{ docker_service }}"
+    state: started
+    enabled: true

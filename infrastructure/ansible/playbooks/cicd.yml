@@ -1,0 +1,6 @@
+- name: Provision CI/CD servers
+  hosts: cicd_servers
+  become: true
+  roles:
+    - docker
+    - cicd-stack

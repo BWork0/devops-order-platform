@@ -1,0 +1,15 @@
+ci_root: /opt/ci
+
+ci_directories:
+  - path: gitea/data
+    owner: "1000"
+    group: "1000"
+  - path: gitea/postgres
+    owner: "999"
+    group: "999"
+  - path: jenkins/data
+    owner: "1000"
+    group: "1000"
+  - path: nexus/data
+    owner: "200"
+    group: "200"
