@@ -1,0 +1,48 @@
+- name: Configure Jenkins build agent
+  hosts: ci_agents
+  become: true
+  roles:
+    - docker
+
+  tasks:
+    - name: Install build tools
+      ansible.builtin.apt:
+        name:
+          - git
+          - openjdk-21-jdk
+        state: present
+        update_cache: true
+
+    - name: Configure Docker for Nexus HTTP registry
+      ansible.builtin.copy:
+        dest: /etc/docker/daemon.json
+        owner: root
+        group: root
+        mode: "0644"
+        content: |
+          {
+            "insecure-registries": [
+              "10.10.10.100:8081"
+            ]
+          }
+      notify: Restart Docker
+    
+    - name: Create Jenkins agent user
+      ansible.builtin.user:
+        name: jenkins
+        shell: /bin/bash
+        create_home: true
+        groups: docker
+        append: true
+
+    - name: Add Jenkins agent public key
+      ansible.posix.authorized_key:
+        user: jenkins
+        state: present
+        key: "{{ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'HOME') + '/.ssh/jenkins_ci_agent.pub') }}"
+
+  handlers:
+    - name: Restart Docker
+      ansible.builtin.systemd:
+        name: docker
+        state: restarted
