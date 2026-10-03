@@ -3,7 +3,6 @@ agent {
 label 'docker'
 }
 
-```
 environment {
     NEXUS_REGISTRY = '10.10.10.100:8081'
     DOCKER_REPOSITORY = 'devops-docker'
@@ -86,6 +85,5 @@ stages {
         }
     }
 }
-```
 
 }
