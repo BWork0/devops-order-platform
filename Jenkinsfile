@@ -128,7 +128,7 @@ lFSgwd+EUoa7AiEA8kQwnXP8Poz3gEqHUzfuZbd1n9FYi20Wltuwn/OSceA=
                     infrastructure/helm/product-service \
                     --namespace devops \
                     --set-string image.tag="$APP_VERSION" \
-                    --wait \
+                    --wait=legacy \
                     --rollback-on-failure \
                     --timeout 5m
 
@@ -136,7 +136,7 @@ lFSgwd+EUoa7AiEA8kQwnXP8Poz3gEqHUzfuZbd1n9FYi20Wltuwn/OSceA=
                     infrastructure/helm/order-service \
                     --namespace devops \
                     --set-string image.tag="$APP_VERSION" \
-                    --wait \
+                    --wait=legacy \
                     --rollback-on-failure \
                     --timeout 5m
             '''
