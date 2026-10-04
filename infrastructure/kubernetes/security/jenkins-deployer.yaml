@@ -23,6 +23,14 @@ rules:
       - update
       - patch
 
+  - apiGroups: ["apps"]
+    resources:
+      - replicasets
+    verbs:
+      - get
+      - list
+      - watch
+
   - apiGroups: [""]
     resources:
       - services
