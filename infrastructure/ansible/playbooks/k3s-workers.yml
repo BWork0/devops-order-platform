@@ -1,0 +1,74 @@
+- name: Read K3s join token from server
+  hosts: k3s_servers
+  become: true
+  gather_facts: false
+
+  tasks:
+    - name: Read K3s server token
+      ansible.builtin.slurp:
+        src: /var/lib/rancher/k3s/server/token
+      register: k3s_token_raw
+      no_log: true
+
+    - name: Store K3s token as host fact
+      ansible.builtin.set_fact:
+        k3s_join_token: "{{ k3s_token_raw.content | b64decode | trim }}"
+      no_log: true
+
+
+- name: Join K3s workers
+  hosts: k3s_agents
+  become: true
+
+  vars:
+    k3s_version: "v1.37.1+k3s1"
+    k3s_server_url: "https://10.10.10.101:6443"
+
+  tasks:
+    - name: Install required packages
+      ansible.builtin.apt:
+        name:
+          - curl
+        state: present
+        update_cache: true
+
+    - name: Create K3s configuration directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Configure K3s agent
+      ansible.builtin.copy:
+        dest: /etc/rancher/k3s/config.yaml
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          server: {{ k3s_server_url }}
+          token: {{ hostvars['k3s-server']['k3s_join_token'] }}
+          node-ip: {{ ansible_host }}
+          node-name: {{ inventory_hostname }}
+      no_log: true
+
+    - name: Download K3s installer
+      ansible.builtin.get_url:
+        url: https://get.k3s.io
+        dest: /tmp/install-k3s.sh
+        mode: "0755"
+
+    - name: Install K3s agent
+      ansible.builtin.command:
+        cmd: /tmp/install-k3s.sh agent
+      environment:
+        INSTALL_K3S_VERSION: "{{ k3s_version }}"
+      args:
+        creates: /etc/systemd/system/k3s-agent.service
+
+    - name: Ensure K3s agent is enabled and running
+      ansible.builtin.systemd:
+        name: k3s-agent
+        enabled: true
+        state: started
