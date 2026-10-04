@@ -1,0 +1,51 @@
+- name: Configure Nexus registry on K3s nodes
+  hosts: k3s_nodes
+  become: true
+
+  vars:
+    nexus_registry: "10.10.10.100:8081"
+
+  tasks:
+    - name: Create K3s configuration directory
+      ansible.builtin.file:
+        path: /etc/rancher/k3s
+        state: directory
+        owner: root
+        group: root
+        mode: "0755"
+
+    - name: Configure Nexus as private container registry
+      ansible.builtin.copy:
+        dest: /etc/rancher/k3s/registries.yaml
+        owner: root
+        group: root
+        mode: "0600"
+        content: |
+          mirrors:
+            "{{ nexus_registry }}":
+              endpoint:
+                - "http://{{ nexus_registry }}"
+
+          configs:
+            "{{ nexus_registry }}":
+              auth:
+                username: "{{ nexus_registry_username }}"
+                password: "{{ nexus_registry_password }}"
+      no_log: true
+      register: registry_config
+
+    - name: Restart K3s server
+      ansible.builtin.systemd:
+        name: k3s
+        state: restarted
+      when:
+        - registry_config.changed
+        - inventory_hostname in groups['k3s_servers']
+
+    - name: Restart K3s agent
+      ansible.builtin.systemd:
+        name: k3s-agent
+        state: restarted
+      when:
+        - registry_config.changed
+        - inventory_hostname in groups['k3s_agents']

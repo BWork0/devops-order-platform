@@ -51,7 +51,9 @@
           token: {{ hostvars['k3s-server']['k3s_join_token'] }}
           node-ip: {{ ansible_host }}
           node-name: {{ inventory_hostname }}
+          flannel-iface: enp0s8
       no_log: true
+      notify: Restart K3s agent
 
     - name: Download K3s installer
       ansible.builtin.get_url:
@@ -72,3 +74,9 @@
         name: k3s-agent
         enabled: true
         state: started
+    
+  handlers:
+    - name: Restart K3s agent
+      ansible.builtin.systemd:
+        name: k3s-agent
+        state: restarted

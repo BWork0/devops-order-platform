@@ -31,6 +31,7 @@
         content: |
           node-ip: {{ k3s_server_ip }}
           advertise-address: {{ k3s_server_ip }}
+          flannel-iface: enp0s8
       notify: Restart K3s
 
     - name: Download K3s installer

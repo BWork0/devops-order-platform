@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: order-service-config
+  namespace: devops
+data:
+  SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/order_db
+  SPRING_JPA_HIBERNATE_DDL_AUTO: update
+  PRODUCT_SERVICE_BASE_URL: http://product-service:8080
