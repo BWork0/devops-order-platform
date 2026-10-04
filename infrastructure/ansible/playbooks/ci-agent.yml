@@ -40,6 +40,48 @@
         user: jenkins
         state: present
         key: "{{ lookup('ansible.builtin.file', lookup('ansible.builtin.env', 'HOME') + '/.ssh/jenkins_ci_agent.pub') }}"
+    
+    - name: Install kubectl prerequisites
+      ansible.builtin.apt:
+        name:
+          - ca-certificates
+          - curl
+          - gnupg
+        state: present
+        update_cache: true
+
+    - name: Create Kubernetes apt keyring directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: "0755"
+
+    - name: Download Kubernetes signing key
+      ansible.builtin.get_url:
+        url: https://pkgs.k8s.io/core:/stable:/v1.37/deb/Release.key
+        dest: /tmp/kubernetes-release.key
+        mode: "0644"
+
+    - name: Install Kubernetes repository key
+      ansible.builtin.command:
+        cmd: >
+          gpg --dearmor
+          -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+          /tmp/kubernetes-release.key
+      args:
+        creates: /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    - name: Add Kubernetes apt repository
+      ansible.builtin.apt_repository:
+        repo: "deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.37/deb/ /"
+        filename: kubernetes
+        state: present
+
+    - name: Install kubectl
+      ansible.builtin.apt:
+        name: kubectl
+        state: present
+        update_cache: true
 
   handlers:
     - name: Restart Docker

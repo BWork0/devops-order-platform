@@ -5,19 +5,24 @@ label 'docker'
 
 environment {
     NEXUS_REGISTRY = '10.10.10.100:8081'
+    MAVEN_REPOSITORY = 'devops-maven-releases'
     DOCKER_REPOSITORY = 'devops-docker'
-    IMAGE_TAG = "0.0.1-${BUILD_NUMBER}"
+
+    APP_VERSION = "0.0.1-${BUILD_NUMBER}"
+    ORDER_IMAGE = "${NEXUS_REGISTRY}/${DOCKER_REPOSITORY}/order-service:${APP_VERSION}"
+    PRODUCT_IMAGE = "${NEXUS_REGISTRY}/${DOCKER_REPOSITORY}/product-service:${APP_VERSION}"
 }
 
 stages {
+
     stage('Test') {
         steps {
             dir('order-service') {
-                sh './mvnw -q test'
+                sh './mvnw -q -Drevision=${APP_VERSION} test'
             }
 
             dir('product-service') {
-                sh './mvnw -q test'
+                sh './mvnw -q -Drevision=${APP_VERSION} test'
             }
         }
     }
@@ -32,11 +37,21 @@ stages {
                 )
             ]) {
                 dir('order-service') {
-                    sh './mvnw -q -s ../infrastructure/ci/settings.xml deploy'
+                    sh '''
+                        ./mvnw -q \
+                            -Drevision=${APP_VERSION} \
+                            -s ../infrastructure/ci/settings.xml \
+                            deploy
+                    '''
                 }
 
                 dir('product-service') {
-                    sh './mvnw -q -s ../infrastructure/ci/settings.xml deploy'
+                    sh '''
+                        ./mvnw -q \
+                            -Drevision=${APP_VERSION} \
+                            -s ../infrastructure/ci/settings.xml \
+                            deploy
+                    '''
                 }
             }
         }
@@ -46,11 +61,11 @@ stages {
         steps {
             sh '''
                 docker build \
-                    -t ${NEXUS_REGISTRY}/${DOCKER_REPOSITORY}/order-service:${IMAGE_TAG} \
+                    -t "$ORDER_IMAGE" \
                     order-service
 
                 docker build \
-                    -t ${NEXUS_REGISTRY}/${DOCKER_REPOSITORY}/product-service:${IMAGE_TAG} \
+                    -t "$PRODUCT_IMAGE" \
                     product-service
             '''
         }
@@ -73,16 +88,59 @@ stages {
                         --username "$NEXUS_USERNAME" \
                         --password-stdin
 
-                    docker push \
-                        ${NEXUS_REGISTRY}/${DOCKER_REPOSITORY}/order-service:${IMAGE_TAG}
-
-                    docker push \
-                        ${NEXUS_REGISTRY}/${DOCKER_REPOSITORY}/product-service:${IMAGE_TAG}
+                    docker push "$ORDER_IMAGE"
+                    docker push "$PRODUCT_IMAGE"
 
                     docker logout "$NEXUS_REGISTRY"
                 '''
             }
         }
+    }
+
+    stage('Deploy to K3s') {
+        steps {
+            withKubeConfig([
+                credentialsId: 'k3s-jenkins-token',
+                serverUrl: 'https://10.10.10.101:6443',
+                namespace: 'devops',
+                caCertificate: '''-----BEGIN CERTIFICATE-----
+MIIBeDCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy
+dmVyLWNhQDE3OTExMDUwMTIwHhcNMjYxMDA0MDgxMDEyWhcNMzYxMDAxMDgxMDEy
+WjAjMSEwHwYDVQQDDBhrM3Mtc2VydmVyLWNhQDE3OTExMDUwMTIwWTATBgcqhkjO
+PQIBBggqhkjOPQMBBwNCAAQjg7NaWOuDMOhekyoLA1vKJKQJZcaXpe9NQKno/GCc
+ickSDAcwV5tlN47bWMQCZfhxGAFUcSDIPrKSUZTuEoCjo0IwQDAOBgNVHQ8BAf8E
+BAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUnLZUQ0GWxCJfqsAWNdGr
+IzVBgi8wCgYIKoZIzj0EAwIDSQAwRgIhAM57cO7s57U5V2RIeeQEt4dgdJih6EiF
+lFSgwd+EUoa7AiEA8kQwnXP8Poz3gEqHUzfuZbd1n9FYi20Wltuwn/OSceA=
+-----END CERTIFICATE-----'''
+            ]) {
+                sh '''
+                    kubectl set image \
+                        deployment/product-service \
+                        product-service="$PRODUCT_IMAGE"
+
+                    kubectl set image \
+                        deployment/order-service \
+                        order-service="$ORDER_IMAGE"
+
+                    kubectl rollout status \
+                        deployment/product-service \
+                        --timeout=120s
+
+                    kubectl rollout status \
+                        deployment/order-service \
+                        --timeout=120s
+                '''
+            }
+        }
+    }
+}
+
+post {
+    always {
+        sh '''
+            docker logout "$NEXUS_REGISTRY" || true
+        '''
     }
 }
 
