@@ -97,13 +97,22 @@ stages {
         }
     }
 
-    stage('Deploy to K3s') {
-        steps {
-            withKubeConfig([
-                credentialsId: 'k3s-jenkins-token',
-                serverUrl: 'https://10.10.10.101:6443',
-                namespace: 'devops',
-                caCertificate: '''-----BEGIN CERTIFICATE-----
+    stage('Validate Helm Charts') {
+    steps {
+        sh '''
+            helm lint infrastructure/helm/product-service
+            helm lint infrastructure/helm/order-service
+        '''
+    }
+}
+
+stage('Deploy to K3s') {
+    steps {
+        withKubeConfig([
+            credentialsId: 'k3s-jenkins-token',
+            serverUrl: 'https://10.10.10.101:6443',
+            namespace: 'devops',
+            caCertificate: '''-----BEGIN CERTIFICATE-----
 MIIBeDCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy
 dmVyLWNhQDE3OTExMDUwMTIwHhcNMjYxMDA0MDgxMDEyWhcNMzYxMDAxMDgxMDEy
 WjAjMSEwHwYDVQQDDBhrM3Mtc2VydmVyLWNhQDE3OTExMDUwMTIwWTATBgcqhkjO
@@ -113,27 +122,27 @@ BAMCAqQwDwYDVR0TAQH/BAUwAwEB/zAdBgNVHQ4EFgQUnLZUQ0GWxCJfqsAWNdGr
 IzVBgi8wCgYIKoZIzj0EAwIDSQAwRgIhAM57cO7s57U5V2RIeeQEt4dgdJih6EiF
 lFSgwd+EUoa7AiEA8kQwnXP8Poz3gEqHUzfuZbd1n9FYi20Wltuwn/OSceA=
 -----END CERTIFICATE-----'''
-            ]) {
-                sh '''
-                    kubectl set image \
-                        deployment/product-service \
-                        product-service="$PRODUCT_IMAGE"
+        ]) {
+            sh '''
+                helm upgrade --install product-service \
+                    infrastructure/helm/product-service \
+                    --namespace devops \
+                    --set-string image.tag="$APP_VERSION" \
+                    --wait \
+                    --rollback-on-failure \
+                    --timeout 5m
 
-                    kubectl set image \
-                        deployment/order-service \
-                        order-service="$ORDER_IMAGE"
-
-                    kubectl rollout status \
-                        deployment/product-service \
-                        --timeout=120s
-
-                    kubectl rollout status \
-                        deployment/order-service \
-                        --timeout=120s
-                '''
-            }
+                helm upgrade --install order-service \
+                    infrastructure/helm/order-service \
+                    --namespace devops \
+                    --set-string image.tag="$APP_VERSION" \
+                    --wait \
+                    --rollback-on-failure \
+                    --timeout 5m
+            '''
         }
     }
+}
 }
 
 post {
