@@ -1,0 +1,90 @@
+jaeger:
+  enabled: true
+  replicas: 1
+
+  extraEnv:
+    - name: ES_USERNAME
+      valueFrom:
+        secretKeyRef:
+          name: jaeger-elasticsearch
+          key: username
+
+    - name: ES_PASSWORD
+      valueFrom:
+        secretKeyRef:
+          name: jaeger-elasticsearch
+          key: password
+
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      cpu: "1"
+      memory: 1Gi
+
+  service:
+    type: ClusterIP
+
+provisionDataStore:
+  cassandra: false
+  elasticsearch: false
+
+storage:
+  type: elasticsearch
+
+userconfig:
+  service:
+    extensions:
+      - jaeger_storage
+      - jaeger_query
+      - healthcheckv2
+
+    pipelines:
+      traces:
+        receivers:
+          - otlp
+        processors:
+          - batch
+        exporters:
+          - jaeger_storage_exporter
+
+  extensions:
+    healthcheckv2:
+      use_v2: true
+      http:
+        endpoint: 0.0.0.0:13133
+
+    jaeger_query:
+      storage:
+        traces: primary_store
+
+    jaeger_storage:
+      backends:
+        primary_store:
+          elasticsearch:
+            server_urls:
+              - https://elasticsearch-es-http.elastic.svc:9200
+
+            auth:
+              basic:
+                username: ${ES_USERNAME}
+                password: ${ES_PASSWORD}
+
+            tls:
+              insecure_skip_verify: true
+
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+  processors:
+    batch: {}
+
+  exporters:
+    jaeger_storage_exporter:
+      trace_storage: primary_store

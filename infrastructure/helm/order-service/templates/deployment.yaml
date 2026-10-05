@@ -59,6 +59,24 @@ spec:
                 secretKeyRef:
                   name: {{ .Values.postgresSecret.name }}
                   key: {{ .Values.postgresSecret.passwordKey }}
+            
+            - name: OTEL_SERVICE_NAME
+              value: "order-service"
+
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://otel-collector-opentelemetry-collector.tracing.svc.cluster.local:4317"
+
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
 
           readinessProbe:
             httpGet:
