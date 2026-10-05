@@ -28,6 +28,8 @@ spec:
               containerPort: 8080
 
           env:
+            - name: MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE
+              value: "health,info,prometheus"
             - name: SPRING_DATASOURCE_URL
               valueFrom:
                 configMapKeyRef:

@@ -1,0 +1,45 @@
+- name: Install Kubernetes monitoring stack
+  hosts: k3s_servers
+  become: true
+
+  tasks:
+    - name: Add Prometheus Community Helm repository
+      kubernetes.core.helm_repository:
+        name: prometheus-community
+        repo_url: https://prometheus-community.github.io/helm-charts
+
+    - name: Update Helm repositories
+      ansible.builtin.command:
+        cmd: helm repo update
+      changed_when: false
+
+    - name: Create monitoring namespace
+      kubernetes.core.k8s:
+        name: monitoring
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+    - name: Copy monitoring values
+      ansible.builtin.copy:
+        src: ../files/monitoring-values.yaml
+        dest: /tmp/monitoring-values.yaml
+        mode: "0644"
+
+    - name: Install kube-prometheus-stack
+      kubernetes.core.helm:
+        name: monitoring
+        chart_ref: prometheus-community/kube-prometheus-stack
+        release_namespace: monitoring
+        create_namespace: true
+        values_files:
+          - /tmp/monitoring-values.yaml
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+        wait: true
+        timeout: 10m
+
+    - name: Wait for monitoring pods
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml wait --for=condition=Ready pods --all -n monitoring --timeout=600s
+      changed_when: false
