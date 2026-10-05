@@ -1,0 +1,45 @@
+apiVersion: logstash.k8s.elastic.co/v1alpha1
+kind: Logstash
+metadata:
+  name: logstash
+  namespace: elastic
+spec:
+  version: 9.2.2
+  count: 1
+
+  elasticsearchRefs:
+    - name: elasticsearch
+      clusterName: elasticsearch
+
+  podTemplate:
+    spec:
+      containers:
+        - name: logstash
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+  pipelines:
+    - pipeline.id: main
+      config.string: |
+        input {
+          beats {
+            port => 5044
+          }
+        }
+
+        filter {
+        }
+
+        output {
+          elasticsearch {
+            hosts => [ "${ELASTICSEARCH_ES_HOSTS}" ]
+            user => "${ELASTICSEARCH_ES_USER}"
+            password => "${ELASTICSEARCH_ES_PASSWORD}"
+            ssl_certificate_authorities => "${ELASTICSEARCH_ES_SSL_CERTIFICATE_AUTHORITY}"
+          }
+        }

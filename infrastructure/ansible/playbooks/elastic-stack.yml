@@ -23,7 +23,45 @@
         src: /tmp/elasticsearch.yaml
         kubeconfig: /etc/rancher/k3s/k3s.yaml
 
-    - name: Wait for Elasticsearch
+    - name: Wait for Elasticsearch to become Ready
       ansible.builtin.command:
-        cmd: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml wait --for=condition=Ready elasticsearch/elasticsearch -n elastic --timeout=1200s
+        cmd: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml get elasticsearch elasticsearch -n elastic -o jsonpath="{.status.phase}"
+      register: elasticsearch_phase
+      retries: 30
+      delay: 10
+      until: elasticsearch_phase.stdout == "Ready"
+      changed_when: false
+
+    - name: Copy Kibana manifest
+      ansible.builtin.copy:
+        src: ../../kubernetes/elastic/kibana.yaml
+        dest: /tmp/kibana.yaml
+        mode: "0644"
+
+    - name: Deploy Kibana
+      kubernetes.core.k8s:
+        state: present
+        src: /tmp/kibana.yaml
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for Kibana pod to become Ready
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml wait --for=condition=Ready pod -l common.k8s.elastic.co/type=kibana -n elastic --timeout=300s
+      changed_when: false
+
+    - name: Copy Logstash manifest
+      ansible.builtin.copy:
+        src: ../../kubernetes/elastic/logstash.yaml
+        dest: /tmp/logstash.yaml
+        mode: "0644"
+
+    - name: Deploy Logstash
+      kubernetes.core.k8s:
+        state: present
+        src: /tmp/logstash.yaml
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for Logstash StatefulSet to become Ready
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml rollout status statefulset/logstash-ls -n elastic --timeout=300s
       changed_when: false
