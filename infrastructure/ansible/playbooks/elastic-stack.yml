@@ -1,0 +1,29 @@
+- name: Deploy Elastic Stack
+  hosts: k3s_servers
+  become: true
+
+  tasks:
+    - name: Create Elastic namespace
+      kubernetes.core.k8s:
+        name: elastic
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+    - name: Copy Elasticsearch manifest
+      ansible.builtin.copy:
+        src: ../../kubernetes/elastic/elasticsearch.yaml
+        dest: /tmp/elasticsearch.yaml
+        mode: "0644"
+
+    - name: Deploy Elasticsearch
+      kubernetes.core.k8s:
+        state: present
+        src: /tmp/elasticsearch.yaml
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+    - name: Wait for Elasticsearch
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml wait --for=condition=Ready elasticsearch/elasticsearch -n elastic --timeout=1200s
+      changed_when: false

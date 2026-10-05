@@ -1,0 +1,47 @@
+- name: Install Elastic Cloud on Kubernetes
+  hosts: k3s_servers
+  become: true
+
+  tasks:
+    - name: Add Elastic Helm repository
+      kubernetes.core.helm_repository:
+        name: elastic
+        repo_url: https://helm.elastic.co
+
+    - name: Update Helm repositories
+      ansible.builtin.command:
+        cmd: helm repo update
+      changed_when: false
+
+    - name: Create ECK namespace
+      kubernetes.core.k8s:
+        name: elastic-system
+        api_version: v1
+        kind: Namespace
+        state: present
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+
+    - name: Copy ECK values
+      ansible.builtin.copy:
+        src: ../files/elastic/eck-values.yaml
+        dest: /tmp/eck-values.yaml
+        mode: "0644"
+
+
+    - name: Install ECK operator
+      kubernetes.core.helm:
+        name: elastic-operator
+        chart_ref: elastic/eck-operator
+        chart_version: 3.5.0
+        release_namespace: elastic-system
+        create_namespace: true
+        values_files:
+          - /tmp/eck-values.yaml
+        kubeconfig: /etc/rancher/k3s/k3s.yaml
+        wait: true
+        timeout: 10m
+
+    - name: Wait for ECK operator
+      ansible.builtin.command:
+        cmd: kubectl --kubeconfig /etc/rancher/k3s/k3s.yaml wait --for=condition=Ready pod -l app.kubernetes.io/name=elastic-operator -n elastic-system --timeout=600s
+      changed_when: false
